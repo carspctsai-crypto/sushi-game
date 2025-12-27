@@ -2,21 +2,95 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>假名壽司學堂 - 語音升級版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>假名壽司學堂 - 行動優化版</title>
     <style>
         :root { --wood: #f4d03f; --bg: #fdf2e9; --sushi-red: #e74c3c; }
-        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background-color: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .game-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); width: 400px; text-align: center; border-bottom: 8px solid var(--wood); }
-        .stats { display: flex; justify-content: space-between; font-weight: bold; color: #7f8c8d; margin-bottom: 20px; }
-        .score-val { color: var(--sushi-red); font-size: 1.2em; }
-        .question-box { font-size: 80px; margin: 20px 0; background: #fff; border: 3px dashed #ddd; border-radius: 15px; padding: 10px; position: relative; }
-        .sushi-icon { font-size: 30px; position: absolute; top: -20px; left: 50%; transform: translateX(-50%); }
-        .options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-        button { padding: 15px; font-size: 22px; cursor: pointer; border: 2px solid #eee; background: white; border-radius: 12px; transition: all 0.2s; }
-        button:hover { transform: translateY(-3px); border-color: var(--wood); background-color: #fff9e6; }
-        button:active { transform: translateY(0); }
-        .feedback { height: 30px; margin-top: 15px; font-weight: bold; }
+        
+        /* 響應式佈局優化 */
+        body { 
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; 
+            background-color: var(--bg); 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start; /* 讓內容從頂部開始，防止手機切掉底部 */
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        .game-card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            width: 100%; 
+            max-width: 400px; 
+            text-align: center; 
+            border-bottom: 6px solid var(--wood); 
+            margin-top: 10px;
+        }
+
+        .stats { 
+            display: flex; 
+            justify-content: space-between; 
+            font-weight: bold; 
+            color: #7f8c8d; 
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .score-val { color: var(--sushi-red); }
+
+        .question-box { 
+            font-size: 60px; /* 縮小字體以符合手機螢幕 */
+            margin: 10px 0; 
+            background: #fff; 
+            border: 2px dashed #ddd; 
+            border-radius: 15px; 
+            padding: 15px; 
+            position: relative; 
+        }
+
+        .sushi-icon { font-size: 24px; position: absolute; top: -15px; left: 50%; transform: translateX(-50%); }
+
+        .options { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 10px; 
+            margin-top: 10px;
+        }
+
+        button { 
+            padding: 12px 5px; 
+            font-size: 18px; 
+            cursor: pointer; 
+            border: 2px solid #eee; 
+            background: white; 
+            border-radius: 12px; 
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent; /* 移除手機點擊藍框 */
+        }
+
+        button:active { background-color: #fff9e6; transform: scale(0.95); }
+
+        .feedback { 
+            height: 24px; 
+            margin-top: 10px; 
+            font-weight: bold; 
+            font-size: 14px;
+        }
+
+        #next-btn {
+            width: 100%; 
+            margin-top: 15px; 
+            background: var(--sushi-red); 
+            color: white; 
+            border: none; 
+            padding: 12px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -32,38 +106,39 @@
         <div id="kana-display">あ</div>
     </div>
 
-    <div class="options" id="options-container"></div>
     <div id="feedback" class="feedback"></div>
+    <div class="options" id="options-container"></div>
     
-    <button onclick="nextQuestion()" id="next-btn" style="display:none; width:100%; margin-top:20px; background:var(--sushi-red); color:white; border:none;">下一客壽司 ➔</button>
+    <button onclick="nextQuestion()" id="next-btn" style="display:none;">下一客壽司 ➔</button>
 </div>
 
 <script>
-    // 題庫：包含平假、片假、濁音
     const data = [
-        {k: 'あ', a: 'a', t: '平'}, {k: 'ア', a: 'a', t: '片'},
-        {k: 'が', a: 'ga', t: '濁'}, {k: 'ギ', a: 'gi', t: '濁'},
-        {k: 'ぱ', a: 'pa', t: '濁'}, {k: 'ピ', a: 'pi', t: '濁'},
-        {k: 'す', a: 'su', t: '平'}, {k: 'ズ', a: 'zu', t: '濁'},
-        {k: 'ね', a: 'ne', t: '平'}, {k: 'ボ', a: 'bo', t: '濁'}
+        {k: 'あ', a: 'a'}, {k: 'ア', a: 'a'},
+        {k: 'が', a: 'ga'}, {k: 'ギ', a: 'gi'},
+        {k: 'ぱ', a: 'pa'}, {k: 'ピ', a: 'pi'},
+        {k: 'す', a: 'su'}, {k: 'ズ', a: 'zu'},
+        {k: 'ね', a: 'ne'}, {k: 'ボ', a: 'bo'},
+        {k: 'た', a: 'ta'}, {k: 'だ', a: 'da'}
     ];
 
     let score = 0;
     let currentTask = 1;
 
-    // 瀏覽器語音功能
     function speak(text) {
-        const msg = new SpeechSynthesisUtterance();
-        msg.text = text;
-        msg.lang = 'ja-JP'; // 設定為日文
-        window.speechSynthesis.speak(msg);
+        if ('speechSynthesis' in window) {
+            const msg = new SpeechSynthesisUtterance();
+            msg.text = text;
+            msg.lang = 'ja-JP';
+            window.speechSynthesis.speak(msg);
+        }
     }
 
     function nextQuestion() {
         if(currentTask > 10) {
             alert(`遊戲結束！您的得分是：${score}`);
-            location.reload();
-            return;
+            score = 0; currentTask = 1;
+            document.getElementById('score').innerText = score;
         }
 
         const item = data[Math.floor(Math.random() * data.length)];
@@ -72,7 +147,6 @@
         document.getElementById('next-btn').style.display = "none";
         document.getElementById('count').innerText = currentTask;
         
-        // 自動發音 (模擬語音引導)
         speak(item.k);
 
         const container = document.getElementById('options-container');
@@ -88,16 +162,14 @@
         choices.forEach(c => {
             const btn = document.createElement('button');
             btn.innerText = c;
-            btn.onclick = () => checkAnswer(c, item.a);
+            btn.onclick = () => checkAnswer(btn, c, item.a);
             container.appendChild(btn);
         });
     }
 
-    function checkAnswer(selected, correct) {
+    function checkAnswer(btn, selected, correct) {
         const feedback = document.getElementById('feedback');
         const buttons = document.querySelectorAll('.options button');
-        
-        // 禁用所有按鈕防止重複點擊
         buttons.forEach(b => b.disabled = true);
 
         if(selected === correct) {
@@ -105,18 +177,17 @@
             document.getElementById('score').innerText = score;
             feedback.innerText = "✨ 正確！Oishii!";
             feedback.style.color = "#27ae60";
-            speak("正解"); // 播放正確音效
+            btn.style.backgroundColor = "#d5f5e3";
         } else {
-            feedback.innerText = `❌ 答錯了，這是 "${correct}"`;
+            feedback.innerText = `❌ 不對喔，是 "${correct}"`;
             feedback.style.color = "#e74c3c";
-            speak("不正解"); 
+            btn.style.backgroundColor = "#fadbd8";
         }
         
         document.getElementById('next-btn').style.display = "block";
         currentTask++;
     }
 
-    // 初始化第一題
     window.onload = nextQuestion;
 </script>
 
