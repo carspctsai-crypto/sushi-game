@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>假名壽司大師 Pro - 行動優化版</title>
+    <style>
+        :root { --wood: #e67e22; --gold: #f1c40f; --bg: #fdf2e9; --sushi-red: #e74c3c; }
+        
+        body { 
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; 
+            background-color: var(--bg); 
+            text-align: center; 
+            margin: 0; 
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .game-area { 
+            width: 100%;
+            max-width: 500px; 
+            background: white; 
+            padding: 15px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+            border: 6px solid var(--wood);
+            box-sizing: border-box;
+        }
+        
+        /* 狀態列 */
+        .status { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px;
+        }
+        .rank-badge { 
+            background: var(--gold); 
+            color: #7f4f24; 
+            padding: 4px 10px; 
+            border-radius: 15px; 
+            font-weight: bold; 
+            font-size: 12px; 
+        }
+
+        /* 訂單區域 */
+        .order-zone { 
+            background: #fff; 
+            border: 2px dashed #ccc; 
+            padding: 15px 10px; 
+            margin-bottom: 15px; 
+            border-radius: 10px; 
+        }
+        .target-word { font-size: 18px; color: #7f8c8d; margin-bottom: 10px; font-weight: bold; }
+        .spelling-slots { 
+            display: flex; 
+            justify-content: center; 
+            flex-wrap: wrap; /* 超過寬度自動換行 */
+            gap: 8px; 
+            min-height: 50px; 
+        }
+        .slot { 
+            width: 35px; 
+            height: 45px; 
+            border-bottom: 3px solid var(--wood); 
+            font-size: 28px; 
+            color: var(--sushi-red); 
+            font-weight: bold; 
+        }
+
+        /* 壽司傳送帶 (九宮格改為更緊密排列) */
+        .conveyor-belt { 
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 8px; 
+            background: #f0f0f0; 
+            padding: 12px; 
+            border-radius: 10px; 
+        }
+        .sushi-plate { 
+            cursor: pointer; 
+            background: white; 
+            border-radius: 50%; 
+            aspect-ratio: 1 / 1; /* 保持圓形 */
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 3px 0 #ddd; 
+            border: 2px solid #ddd; 
+            -webkit-tap-highlight-color: transparent;
+        }
+        .kana { font-size: 22px; font-weight: bold; }
+
+        /* 提示特效 */
+        @keyframes hint-glow {
+            0% { border-color: var(--gold); transform: scale(1); }
+            50% { border-color: #ff5722; transform: scale(1.05); box-shadow: 0 0 15px var(--gold); }
+            100% { border-color: var(--gold); transform: scale(1); }
+        }
+        .hint-active { animation: hint-glow 0.8s infinite; z-index: 5; border-width: 3px; }
+
+        .msg { height: 24px; color: #d35400; font-weight: bold; margin: 10px 0; font-size: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="game-area">
+        <div class="status">
+            <div id="rank-display" class="rank-badge">店舖等級：新手路邊攤</div>
+            <div style="font-size: 14px;">營收: <span id="score" style="color: var(--sushi-red);">0</span> 円</div>
+        </div>
+
+        <div class="order-zone">
+            <div id="target-romaji" class="target-word">客人正在看菜單...</div>
+            <div id="spelling-area" class="spelling-slots"></div>
+        </div>
+
+        <div id="msg" class="msg">歡迎光臨！</div>
+        <div class="conveyor-belt" id="belt"></div>
+        
+        <p style="font-size: 11px; color: #999; margin-top: 15px;">※ 連續選錯兩次會出現閃爍提示</p>
+    </div>
+
+<script>
+    const orders = [
+        { word: '壽司', romaji: 'SU-SHI', kana: ['す', 'し'] },
+        { word: '相機', romaji: 'KA-ME-RA', kana: ['カ', 'メ', 'ラ'] },
+        { word: '漢堡', romaji: 'HA-N-BA-A-GAA', kana: ['ハ', 'ン', 'バ', 'ー', 'ガ', 'ー'] },
+        { word: '麵包', romaji: 'PA-N', kana: ['パ', 'ン'] },
+        { word: '飯糰', romaji: 'O-NI-GI-RI', kana: ['お', 'に', 'ぎ', 'り'] },
+        { word: '拉麵', romaji: 'RA-A-ME-N', kana: ['ら', 'ー', 'め', 'ん'] }
+    ];
+
+    const ranks = [
+        { min: 0, name: "新手路邊攤" },
+        { min: 1000, name: "人氣居酒屋" },
+        { min: 3000, name: "知名壽司店" },
+        { min: 6000, name: "傳說中的壽司神" }
+    ];
+
+    let currentOrder = null, userInput = [], score = 0, wrongCount = 0;
+
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            const msg = new SpeechSynthesisUtterance();
+            msg.text = text;
+            msg.lang = 'ja-JP';
+            window.speechSynthesis.speak(msg);
+        }
+    }
+
+    function initOrder() {
+        currentOrder = orders[Math.floor(Math.random() * orders.length)];
+        userInput = []; wrongCount = 0;
+        document.getElementById('target-romaji').innerText = `訂單：${currentOrder.word} (${currentOrder.romaji})`;
+        document.getElementById('msg').innerText = "請照順序點選假名！";
+        
+        const area = document.getElementById('spelling-area');
+        area.innerHTML = '';
+        currentOrder.kana.forEach(() => {
+            const slot = document.createElement('div');
+            slot.className = 'slot';
+            area.appendChild(slot);
+        });
+        generateBelt();
+    }
+
+    function generateBelt() {
+        const belt = document.getElementById('belt');
+        belt.innerHTML = '';
+        let pool = [...currentOrder.kana];
+        const fillers = ['あ','い','う','え','お','か','が','き','ぎ','ぱ','ピ','レ','シ','ン','ど'];
+        while(pool.length < 12) {
+            let r = fillers[Math.floor(Math.random() * fillers.length)];
+            if(!pool.includes(r)) pool.push(r);
+        }
+        pool.sort(() => Math.random() - 0.5);
+
+        pool.forEach(k => {
+            const plate = document.createElement('div');
+            plate.className = 'sushi-plate';
+            plate.dataset.kana = k;
+            plate.innerHTML = `<span class="kana">${k}</span>`;
+            plate.onclick = () => selectKana(k, plate);
+            belt.appendChild(plate);
+        });
+    }
+
+    function selectKana(k, element) {
+        const nextCorrectKana = currentOrder.kana[userInput.length];
+        if (k === nextCorrectKana) {
+            speak(k);
+            userInput.push(k);
+            document.querySelectorAll('.slot')[userInput.length - 1].innerText = k;
+            document.querySelectorAll('.sushi-plate').forEach(p => p.classList.remove('hint-active'));
+            wrongCount = 0;
+            if (userInput.length === currentOrder.kana.length) completeOrder();
+        } else {
+            wrongCount++;
+            speak("違います");
+            document.getElementById('msg').innerText = "❌ 點錯了喔！";
+            if (wrongCount >= 2) showHint();
+        }
+    }
+
+    function showHint() {
+        const nextCorrect = currentOrder.kana[userInput.length];
+        document.querySelectorAll('.sushi-plate').forEach(p => {
+            if (p.dataset.kana === nextCorrect) p.classList.add('hint-active');
+        });
+        document.getElementById('msg').innerText = "💡 提示：看閃爍的壽司！";
+    }
+
+    function completeOrder() {
+        score += 500;
+        document.getElementById('score').innerText = score;
+        document.getElementById('msg').innerText = "🎉 完美！得到 500 円！";
+        speak("素晴らしい");
+        
+        const rank = ranks.slice().reverse().find(r => score >= r.min);
+        document.getElementById('rank-display').innerText = `店舖等級：${rank.name}`;
+        
+        setTimeout(initOrder, 2000);
+    }
+
+    window.onload = initOrder;
+</script>
+</body>
+</html>
